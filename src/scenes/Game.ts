@@ -1,53 +1,118 @@
 import Phaser from "phaser";
+import TextureKeys from "~/consts/TextureKeys";
+import SceneKeys from "~/consts/SceneKeys";
+import AnimationKeys from "~/consts/AnimationKeys";
+import RocketMouse from "~/game/RocketMouse";
 
 export default class Game extends Phaser.Scene {
 
-    static readonly BACKGROUND = "background";
-    static readonly ROCKET_MOUSE_ANIM_KEY = "rocket-mouse";
-    static readonly ROCKET_MOUSE_RUN_ANIM_KEY = "rocket-mouse-run";
+    // create the background class property
+    private background!: Phaser.GameObjects.TileSprite;
+    private mouseHole!: Phaser.GameObjects.Image;
+    private window1!: Phaser.GameObjects.Image;
+    private window2!: Phaser.GameObjects.Image;
 
     constructor() {
-        super("game");
+        super(SceneKeys.Game);
     }
 
     preload() {
-        this.load.image(Game.BACKGROUND, "house/background/bg_repeat_340x640.png")
-        this.load.atlas(
-            Game.ROCKET_MOUSE_ANIM_KEY,
-            "characters/rocket-mouse.png",
-            "characters/rocket-mouse.json")
+
     }
 
     create() {
         const width = this.scale.width;
         const height = this.scale.height;
 
-        this.add.tileSprite(0, 0, width, height, Game.BACKGROUND)
-            .setOrigin(0);
+        this.background = this.add.tileSprite(0, 0, width, height, TextureKeys.Background)
+            .setOrigin(0)
+            .setScrollFactor(0, 0)
 
-        this.anims.create({
-            key: Game.ROCKET_MOUSE_RUN_ANIM_KEY, // name of this animation
-            // helper to generate frames
-            frames: this.anims.generateFrameNames(Game.ROCKET_MOUSE_ANIM_KEY, {
-                start: 1,
-                end: 4,
-                prefix: 'rocketmouse_run',//json files lines
-                zeroPad: 2,
-                suffix: '.png'
-            }),
-            frameRate: 10,
-            repeat: -1 // -1 to loop forever
-        })
+        this.mouseHole = this.add.image(
+            Phaser.Math.Between(900, 1500),
+            501,
+            TextureKeys.MouseHole
+        );
+
+        this.window1 = this.add.image(
+            Phaser.Math.Between(900, 1300),
+            200,
+            TextureKeys.Window1
+        )
+
+        this.window2 = this.add.image(
+            Phaser.Math.Between(1600, 2000),
+            200,
+            TextureKeys.Window2
+        )
+
+        const mouseActor = this.createMouseActor(width, height);
+        this.addWorldPhysics(height);
+        this.followCamera(mouseActor, height);
+
+    }
 
 
-        this.add.sprite(
-            width * 0.5,
-            height * 0.5,
-            Game.ROCKET_MOUSE_ANIM_KEY,
-            "rocketmouse_fly01.png"
-        ).play(Game.ROCKET_MOUSE_RUN_ANIM_KEY)
+    update(t: number, dt: number) {
+        // scroll the background
+        this.background.setTilePosition(this.cameras.main.scrollX)
+        this.wrapMouseHole();
+        this.wrapWindows();
+    }
 
+    private addWorldPhysics(height: number) {
+        this.physics.world.setBounds(
+            0, 0, // x, y
+            Number.MAX_SAFE_INTEGER, height - 30
+        );
+    }
 
+    private followCamera(mouseActor: Phaser.Types.Physics.Arcade.SpriteWithDynamicBody, height: number) {
+        this.cameras.main.startFollow(mouseActor);
+        this.cameras.main.setBounds(0, 0, Number.MAX_SAFE_INTEGER, height);
+    }
+
+    private createMouseActor(width: number, height: number) {
+        const mouseActor = new RocketMouse(this, width * 0.5, height - 30);
+        this.add.existing(mouseActor);
+
+        const body = mouseActor.body as Phaser.Physics.Arcade.Body;
+        body.setCollideWorldBounds(true);
+        body.setVelocityX(200);
+
+        return mouseActor;
+    }
+
+    private wrapMouseHole() {
+        const scrollX = this.cameras.main.scrollX
+        const rightEdge = scrollX + this.scale.width
+
+        if (this.mouseHole.x + this.mouseHole.width < scrollX) {
+            this.mouseHole.x = Phaser.Math.Between(
+                rightEdge + 100,
+                rightEdge + 1000
+            )
+        }
+    }
+
+    private wrapWindows() {
+        const scrollX = this.cameras.main.scrollX
+        const rightEdge = scrollX + this.scale.width
+        // multiply by 2 to add some more padding
+        let width = this.window1.width * 2
+        if (this.window1.x + width < scrollX) {
+            this.window1.x = Phaser.Math.Between(
+                rightEdge + width,
+                rightEdge + width + 800
+            )
+        }
+
+        width = this.window2.width
+        if (this.window2.x + width < scrollX) {
+            this.window2.x = Phaser.Math.Between(
+                this.window1.x + width,
+                this.window1.x + width + 800)
+        }
     }
 
 }
